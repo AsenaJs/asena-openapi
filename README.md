@@ -48,15 +48,7 @@ import { OpenApi, OpenApiPostProcessor } from '@asenajs/asena-openapi';
 export class AppOpenApi extends OpenApiPostProcessor {}
 ```
 
-Add it to your components — that's it:
-
-```typescript
-const components = [
-  AppConfig,
-  AppOpenApi,
-  // ... your controllers, services, validators
-];
-```
+Asena automatically discovers it — that's it.
 
 Now:
 
