@@ -1,0 +1,59 @@
+{
+  "name": "@asenajs/asena-openapi",
+  "version": "1.0.0",
+  "author": "LibirSoft",
+  "description": "OpenAPI 3.1 spec generation for AsenaJS - automatic schema extraction from validators and route decorators",
+  "main": "dist/index.js",
+  "module": "index.ts",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AsenaJs/asena-openapi.git"
+  },
+  "scripts": {
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage",
+    "build": "bun run clean && tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run build",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "bun run lint && bun run format:check",
+    "check:fix": "bun run lint:fix && bun run format",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "bun run build && changeset publish"
+  },
+  "devDependencies": {
+    "@asenajs/asena": "^0.7.0",
+    "@changesets/cli": "^2.29.3",
+    "@types/bun": "latest",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "typescript": "^5.9.3",
+    "eslint": "^8.57.1",
+    "eslint-config-alloy": "^5.1.2",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-alloy": "^1.2.1",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-n": "^16.6.2",
+    "eslint-plugin-prettier": "^5.4.0",
+    "eslint-plugin-promise": "^6.6.0",
+    "prettier": "^3.5.3",
+    "reflect-metadata": "^0.2.2",
+    "zod": "^4.3.6"
+  },
+  "peerDependencies": {
+    "@asenajs/asena": "^0.7.0",
+    "reflect-metadata": "^0.2.2",
+    "zod": "^4.3.6"
+  }
+}
