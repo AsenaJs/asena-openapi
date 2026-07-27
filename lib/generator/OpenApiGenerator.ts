@@ -1,7 +1,12 @@
 import { ComponentType } from '@asenajs/asena/ioc/types';
 import type { Container } from '@asenajs/asena/container';
 import type { ApiParams } from '@asenajs/asena/adapter';
-import { extractComponentName, extractControllerRouteInfo, getOwnTypedMetadata } from '@asenajs/asena/utils';
+import {
+  extractComponentName,
+  extractControllerRouteInfo,
+  getChainedTypedMetadataList,
+  getOwnTypedMetadata,
+} from '@asenajs/asena/utils';
 import { OpenApiConstants } from '../constants/OpenApiConstants';
 import type {
   JsonSchema,
@@ -60,13 +65,15 @@ export class OpenApiGenerator {
     const tagSet = new Set<string>();
 
     for (const controller of controllers) {
-      const hiddenMeta = getOwnTypedMetadata(OpenApiConstants.HiddenKey, controller.constructor);
-
-      // Class-level @Hidden → skip entire controller
-      if (hiddenMeta === true) continue;
+      // Class-level stays own-only; method-level walks the chain, because extractControllerRouteInfo
+      // now returns inherited routes and a base class's @Hidden has to follow its method.
+      if (getOwnTypedMetadata(OpenApiConstants.HiddenClassKey, controller.constructor) === true) continue;
 
       const { basePath, controllerName, routes } = extractControllerRouteInfo(controller);
-      const hiddenMethods: string[] = Array.isArray(hiddenMeta) ? (hiddenMeta as string[]) : [];
+      const hiddenMethods = getChainedTypedMetadataList<string>(
+        OpenApiConstants.HiddenMethodsKey,
+        controller.constructor,
+      );
 
       if (Object.keys(routes).length === 0) continue;
 

@@ -29,11 +29,12 @@ export function Hidden(): ClassDecorator & MethodDecorator {
   return function (target: any, propertyKey?: string | symbol) {
     if (propertyKey === undefined) {
       // Class-level: mark entire controller as hidden
-      defineTypedMetadata<boolean>(OpenApiConstants.HiddenKey, true, target);
+      defineTypedMetadata<boolean>(OpenApiConstants.HiddenClassKey, true, target);
     } else {
-      // Method-level: accumulate hidden method names (like @Override pattern)
+      // Method-level: accumulate hidden method names on the declaring class (like @Override).
+      // A separate key from the class-level flag - see OpenApiConstants for why.
       const hiddenMethods: string[] =
-        getOwnTypedMetadata<string[]>(OpenApiConstants.HiddenKey, target.constructor) || [];
+        getOwnTypedMetadata<string[]>(OpenApiConstants.HiddenMethodsKey, target.constructor) || [];
 
       const key = String(propertyKey);
 
@@ -41,7 +42,7 @@ export function Hidden(): ClassDecorator & MethodDecorator {
         hiddenMethods.push(key);
       }
 
-      defineTypedMetadata<string[]>(OpenApiConstants.HiddenKey, hiddenMethods, target.constructor);
+      defineTypedMetadata<string[]>(OpenApiConstants.HiddenMethodsKey, hiddenMethods, target.constructor);
     }
   };
 }

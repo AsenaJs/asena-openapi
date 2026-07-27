@@ -407,3 +407,105 @@ describe('OpenApiGenerator', () => {
     expect(spec.servers![0].url).toBe('https://api.example.com');
   });
 });
+
+// The openapi package had zero inheritance coverage - not one `extends` in any fixture - which
+// is why the @Hidden regression went unnoticed. Once core started merging inherited routes into
+// extractControllerRouteInfo, a base class's routes reached the spec while its own-only @Hidden
+// marks did not, so an endpoint its author marked internal was published.
+describe('OpenApiGenerator inheritance', () => {
+  let generator: OpenApiGenerator;
+  let container: Container;
+
+  beforeEach(() => {
+    container = new Container();
+    generator = new OpenApiGenerator({
+      info: { title: 'Test API', version: '1.0.0' },
+      converters: [new ZodSchemaConverter()],
+    });
+  });
+
+  test('publishes a route declared on a base class under the subclass base path', async () => {
+    abstract class HealthBase {
+      @Get('/live')
+      live() {}
+    }
+
+    @Controller('/api')
+    class ApiController extends HealthBase {
+      @Get('/things')
+      things() {}
+    }
+
+    await container.registerInstance('ApiController', new ApiController());
+
+    const spec = await generator.generate(container);
+
+    expect(Object.keys(spec.paths).sort()).toEqual(['/api/live', '/api/things']);
+  });
+
+  test('a @Hidden method on a base class stays out of the spec', async () => {
+    abstract class AdminBase {
+      @Hidden()
+      @Get('/internal-metrics')
+      metrics() {}
+
+      @Get('/status')
+      status() {}
+    }
+
+    @Controller('/api')
+    class PublicController extends AdminBase {}
+
+    await container.registerInstance('PublicController', new PublicController());
+
+    const spec = await generator.generate(container);
+
+    // The regression, precisely: /api/internal-metrics was both routable and published.
+    expect(Object.keys(spec.paths)).toEqual(['/api/status']);
+  });
+
+  test('the subclass keeps its own hidden methods alongside the inherited ones', async () => {
+    abstract class AdminBase {
+      @Hidden()
+      @Get('/internal-metrics')
+      metrics() {}
+    }
+
+    @Controller('/api')
+    class PublicController extends AdminBase {
+      @Hidden()
+      @Get('/debug')
+      debug() {}
+
+      @Get('/public')
+      publicRoute() {}
+    }
+
+    await container.registerInstance('PublicController', new PublicController());
+
+    const spec = await generator.generate(container);
+
+    expect(Object.keys(spec.paths)).toEqual(['/api/public']);
+  });
+
+  test('a class-level @Hidden on a base does NOT hide the subclass', async () => {
+    @Hidden()
+    @Controller('/internal')
+    class InternalBase {
+      @Get('/thing')
+      thing() {}
+    }
+
+    @Controller('/public')
+    class PublicController extends InternalBase {}
+
+    await container.registerInstance('InternalBase', new InternalBase());
+    await container.registerInstance('PublicController', new PublicController());
+
+    const spec = await generator.generate(container);
+
+    // Class-level marks describe the class they decorate. Re-exposing a hidden base under a
+    // new @Controller is a legitimate thing to write, and inheriting the flag would forbid it.
+    expect(Object.keys(spec.paths)).toEqual(['/public/thing']);
+  });
+});

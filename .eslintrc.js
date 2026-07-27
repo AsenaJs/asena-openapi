@@ -4,7 +4,7 @@ module.exports = {
     es2021: true,
   },
   extends: ['alloy', 'alloy/typescript', 'prettier'],
-  ignorePatterns: ['**/*.test.ts', '**/*.spec.ts'],
+  ignorePatterns: ['scripts/', '**/*.test.ts', '**/*.spec.ts'],
   overrides: [
     {
       env: {
