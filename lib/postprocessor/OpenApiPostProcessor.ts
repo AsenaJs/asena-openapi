@@ -3,6 +3,7 @@ import { ICoreServiceNames } from '@asenajs/asena/ioc/types';
 import {
   extractComponentName,
   extractControllerRouteInfo,
+  getChainedTypedMetadataList,
   getOwnTypedMetadata,
   isValidator as isValidatorUtil,
   isController as isControllerUtil,
@@ -85,7 +86,7 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
 
   public postProcess<T>(instance: T, Class: any): T {
     if (this.isController(Class)) {
-      const isHidden = getOwnTypedMetadata(OpenApiConstants.HiddenKey, Class);
+      const isHidden = getOwnTypedMetadata(OpenApiConstants.HiddenClassKey, Class);
 
       if (isHidden !== true) {
         this.controllers.push({ instance, Class });
@@ -130,8 +131,7 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
     const tagMap = new Map<string, string>();
 
     for (const { instance, Class } of this.controllers) {
-      const hiddenMeta = getOwnTypedMetadata(OpenApiConstants.HiddenKey, Class);
-      const hiddenMethods: string[] = Array.isArray(hiddenMeta) ? (hiddenMeta as string[]) : [];
+      const hiddenMethods = getChainedTypedMetadataList<string>(OpenApiConstants.HiddenMethodsKey, Class);
 
       const {
         basePath,

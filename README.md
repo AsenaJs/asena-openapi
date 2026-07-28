@@ -4,9 +4,9 @@
 
 # @asenajs/asena-openapi
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/AsenaJs/asena-openapi)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/AsenaJs/asena-openapi)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Bun Version](https://img.shields.io/badge/Bun-1.3.11%2B-blueviolet)](https://bun.sh)
+[![Bun Version](https://img.shields.io/badge/Bun-1.3.12%2B-blueviolet)](https://bun.sh)
 
 Automatic OpenAPI 3.1 spec generation for AsenaJS — zero config, uses your existing validators.
 
@@ -25,8 +25,8 @@ Your existing `@Controller` routes and validator schemas (`json()`, `query()`, `
 
 ## Requirements
 
-- [Bun](https://bun.sh) v1.3.11 or higher
-- [@asenajs/asena](https://github.com/AsenaJs/Asena) v0.7.0 or higher
+- [Bun](https://bun.sh) v1.3.12 or higher
+- [@asenajs/asena](https://github.com/AsenaJs/Asena) v0.9.0 or higher
 - [Zod](https://zod.dev) v4.3 or higher
 
 ## Installation

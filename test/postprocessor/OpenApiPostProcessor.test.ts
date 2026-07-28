@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach, mock } from 'bun:test';
 import { z } from 'zod';
 import { Container } from '@asenajs/asena/container';
-import { Controller, Middleware } from '@asenajs/asena/decorators';
+import { Controller, Middleware, Service } from '@asenajs/asena/decorators';
 import { Get, Post } from '@asenajs/asena/decorators/http';
 import { OpenApiPostProcessor } from '../../lib/postprocessor/OpenApiPostProcessor';
 import { OpenApi, type OpenApiDecoratorOptions } from '../../lib/decorators/OpenApi';
@@ -385,6 +385,125 @@ describe('OpenApiPostProcessor', () => {
 
       expect(spec.paths['/api/public']).toBeDefined();
       expect(spec.paths['/api/secret']).toBeUndefined();
+    });
+  });
+
+  // The PostProcessor is the path a running app takes; OpenApiGenerator is the legacy
+  // standalone entry point. Its inheritance coverage lived only on the generator, so nothing
+  // proved the two agree - and the @Hidden regression (a base class's routes reaching the spec
+  // while its own-only @Hidden marks did not) is a property of this class, not of that one.
+  describe('inheritance', () => {
+    test('publishes a route declared on a base class under the subclass base path', async () => {
+      const pp = createPostProcessor(container);
+
+      abstract class HealthBase {
+        @Get('/live')
+        live() {}
+      }
+
+      @Controller('/api')
+      class ApiController extends HealthBase {
+        @Get('/things')
+        things() {}
+      }
+
+      pp.postProcess(new ApiController(), ApiController);
+
+      const spec = await pp.getSpec();
+
+      expect(Object.keys(spec.paths).sort()).toEqual(['/api/live', '/api/things']);
+    });
+
+    test('a @Hidden method on a base class stays out of the spec', async () => {
+      const pp = createPostProcessor(container);
+
+      abstract class AdminBase {
+        @Hidden()
+        @Get('/internal-metrics')
+        metrics() {}
+
+        @Get('/status')
+        status() {}
+      }
+
+      @Controller('/api')
+      class PublicController extends AdminBase {}
+
+      pp.postProcess(new PublicController(), PublicController);
+
+      const spec = await pp.getSpec();
+
+      // The regression precisely: /api/internal-metrics was both routable and published.
+      expect(Object.keys(spec.paths)).toEqual(['/api/status']);
+    });
+
+    test('the subclass keeps its own hidden methods alongside the inherited ones', async () => {
+      const pp = createPostProcessor(container);
+
+      abstract class AdminBase {
+        @Hidden()
+        @Get('/internal-metrics')
+        metrics() {}
+      }
+
+      @Controller('/api')
+      class PublicController extends AdminBase {
+        @Hidden()
+        @Get('/debug')
+        debug() {}
+
+        @Get('/public')
+        publicRoute() {}
+      }
+
+      pp.postProcess(new PublicController(), PublicController);
+
+      const spec = await pp.getSpec();
+
+      expect(Object.keys(spec.paths)).toEqual(['/api/public']);
+    });
+
+    test('a class-level @Hidden on a base does NOT hide the subclass', async () => {
+      const pp = createPostProcessor(container);
+
+      @Hidden()
+      @Controller('/internal')
+      class InternalBase {
+        @Get('/thing')
+        thing() {}
+      }
+
+      @Controller('/public')
+      class PublicController extends InternalBase {}
+
+      // The hidden base is offered to the collector too - it must be the one that is dropped.
+      pp.postProcess(new InternalBase(), InternalBase);
+      pp.postProcess(new PublicController(), PublicController);
+
+      expect((pp as any).controllers.length).toBe(1);
+
+      const spec = await pp.getSpec();
+
+      expect(Object.keys(spec.paths)).toEqual(['/public/thing']);
+    });
+
+    test('a @Service extending a @Controller is not collected as a controller', () => {
+      const pp = createPostProcessor(container);
+
+      @Controller('/reports')
+      class ReportController {
+        @Get('/list')
+        list() {}
+      }
+
+      @Service('DerivedReportService')
+      class DerivedReportService extends ReportController {}
+
+      pp.postProcess(new DerivedReportService(), DerivedReportService);
+
+      // Component identity is own-only. Collecting it would publish /list a second time, at the
+      // server root, because @Controller's PathKey does not travel with the subclass.
+      expect((pp as any).controllers.length).toBe(0);
     });
   });
 
