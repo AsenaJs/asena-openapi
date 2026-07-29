@@ -1,5 +1,17 @@
 # @asenajs/asena-openapi
 
+## 2.0.0
+
+### Major Changes
+
+- The core peer moves to `^0.10.0`
+
+  No source change. `@asenajs/asena@0.10.0` moves component start hooks out of the container and
+  into `server.start()`; `OpenApiPostProcessor` is a `@PostProcessor`, so its own hook keeps running
+  at construction and its behaviour is unaffected.
+
+  **Breaking:** requires `@asenajs/asena@^0.10.0`. A 0.9.x application cannot use this version.
+
 ## 1.1.0
 
 ### Minor Changes
