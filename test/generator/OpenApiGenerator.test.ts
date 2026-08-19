@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { Container } from '@asenajs/asena/container';
 import { Controller, Middleware } from '@asenajs/asena/decorators';
-import { Delete, Get, Post } from '@asenajs/asena/decorators/http';
+import { All, Delete, Get, Post } from '@asenajs/asena/decorators/http';
 import { OpenApiGenerator } from '../../lib/generator/OpenApiGenerator';
 import { ZodSchemaConverter } from '../../lib/converter/ZodSchemaConverter';
 import { Hidden } from '../../lib/decorators';
@@ -94,6 +94,67 @@ describe('OpenApiGenerator', () => {
     const spec = await generator.generate(container);
 
     expect(spec.paths['/api/users/{userId}/posts/{postId}']).toBeDefined();
+
+    // Every path variable needs a parameter entry, one per template variable
+    expect(spec.paths['/api/users/{userId}/posts/{postId}']['get'].parameters).toEqual([
+      { name: 'userId', in: 'path', required: true, schema: { type: 'string' } },
+      { name: 'postId', in: 'path', required: true, schema: { type: 'string' } },
+    ]);
+  });
+
+  test('should reject two controllers claiming the same path and method', async () => {
+    @Controller('/api/users')
+    class UserController {
+      @Get('/')
+      list() {}
+    }
+
+    @Controller('/api/users')
+    class LegacyUserController {
+      @Get('/')
+      list() {}
+    }
+
+    await container.registerInstance('UserController', new UserController());
+    await container.registerInstance('LegacyUserController', new LegacyUserController());
+
+    // Silently keeping the last writer meant a routable endpoint vanished from the docs
+    await expect(generator.generate(container)).rejects.toThrow(/collision/);
+  });
+
+  test('should skip routes whose method has no OpenAPI representation', async () => {
+    @Controller('/api')
+    class CatchAllController {
+      @All('/proxy')
+      proxy() {}
+
+      @Get('/health')
+      health() {}
+    }
+
+    await container.registerInstance('CatchAllController', new CatchAllController());
+
+    const spec = await generator.generate(container);
+
+    // `all` is not a Path Item field - emitting it produced a spec that fails validation
+    expect(spec.paths['/api/proxy']).toBeUndefined();
+    expect(spec.paths['/api/health']['get']).toBeDefined();
+  });
+
+  test('should include route summary', async () => {
+    // The generator used to drop summary while the postprocessor emitted it; both now share
+    // one operation builder, so the two spec sources cannot describe the same route differently.
+    @Controller('/api')
+    class SummaryController {
+      @Get({ path: '/items', summary: 'List items' })
+      listItems() {}
+    }
+
+    await container.registerInstance('SummaryController', new SummaryController());
+
+    const spec = await generator.generate(container);
+
+    expect(spec.paths['/api/items']['get'].summary).toBe('List items');
   });
 
   test('should generate tags from controller names', async () => {
@@ -180,6 +241,37 @@ describe('OpenApiGenerator', () => {
       expect(op.requestBody).toBeDefined();
       expect(op.requestBody!.content['application/json']).toBeDefined();
       expect(op.requestBody!.content['application/json'].schema.properties).toBeDefined();
+    });
+
+    test('should map validator.form() file fields to multipart/form-data binary', async () => {
+      @Middleware({ validator: true })
+      class UploadValidator {
+        form() {
+          return z.object({ image: z.file(), title: z.string() });
+        }
+      }
+
+      @Controller('/api')
+      class TestController {
+        @Post({ path: '/upload', validator: UploadValidator as any })
+        upload() {}
+      }
+
+      await container.registerInstance('UploadValidator', new UploadValidator());
+      await container.registerInstance('TestController', new TestController());
+
+      const spec = await generator.generate(container);
+      const op = spec.paths['/api/upload']['post'];
+
+      expect(op.requestBody).toBeDefined();
+
+      const content = op.requestBody!.content['multipart/form-data'];
+
+      expect(content).toBeDefined();
+      // toMatchObject: z.toJSONSchema also emits contentEncoding alongside format;
+      // the load-bearing part for Swagger UI's file picker is type+format
+      expect(content.schema.properties.image).toMatchObject({ type: 'string', format: 'binary' });
+      expect(content.schema.properties.title).toMatchObject({ type: 'string' });
     });
 
     test('should extract query parameters from validator.query()', async () => {

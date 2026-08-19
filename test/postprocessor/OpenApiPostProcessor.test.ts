@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach, mock } from 'bun:test';
 import { z } from 'zod';
 import { Container } from '@asenajs/asena/container';
 import { Controller, Middleware, Service } from '@asenajs/asena/decorators';
-import { Get, Post } from '@asenajs/asena/decorators/http';
+import { All, Get, Post } from '@asenajs/asena/decorators/http';
 import { OpenApiPostProcessor } from '../../lib/postprocessor/OpenApiPostProcessor';
 import { OpenApi, type OpenApiDecoratorOptions } from '../../lib/decorators/OpenApi';
 import { OpenApiConstants } from '../../lib/constants/OpenApiConstants';
@@ -157,6 +157,251 @@ describe('OpenApiPostProcessor', () => {
       const spec = await pp.getSpec();
 
       expect(spec.paths['/api/users/{id}']).toBeDefined();
+
+      // OpenAPI requires a parameter for every path variable; without one the spec fails
+      // validation and Swagger UI offers no field to fill the segment in.
+      expect(spec.paths['/api/users/{id}']['get'].parameters).toEqual([
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+      ]);
+    });
+
+    test('keeps the validator schema for a path param it declares', async () => {
+      const pp = createPostProcessor(container, {
+        info: { title: 'Test', version: '1.0.0' },
+      });
+
+      @Middleware({ validator: true })
+      class IdValidator {
+        param() {
+          return z.object({ id: z.coerce.number() });
+        }
+      }
+
+      @Controller('/api/users')
+      class UserController {
+        @Get({ path: '/:id', validator: IdValidator as any })
+        getById() {}
+      }
+
+      pp.postProcess(new IdValidator(), IdValidator);
+      pp.postProcess(new UserController(), UserController);
+
+      const spec = await pp.getSpec();
+
+      const params = spec.paths['/api/users/{id}']['get'].parameters!;
+
+      // Synthesis fills gaps only - a declared param keeps its own schema and is not duplicated
+      expect(params.length).toBe(1);
+      expect(params[0].name).toBe('id');
+      expect(params[0].schema).not.toEqual({ type: 'string' });
+    });
+
+    test('drops path params the route template does not contain', async () => {
+      const pp = createPostProcessor(container, {
+        info: { title: 'Test', version: '1.0.0' },
+      });
+
+      @Middleware({ validator: true })
+      class StrayValidator {
+        param() {
+          return z.object({ id: z.string(), ghost: z.string() });
+        }
+      }
+
+      @Controller('/api/users')
+      class UserController {
+        @Get({ path: '/:id', validator: StrayValidator as any })
+        getById() {}
+      }
+
+      pp.postProcess(new StrayValidator(), StrayValidator);
+      pp.postProcess(new UserController(), UserController);
+
+      const spec = await pp.getSpec();
+
+      const params = spec.paths['/api/users/{id}']['get'].parameters!;
+
+      // A path parameter absent from the template is invalid OpenAPI, whatever the schema says
+      expect(params.map((p) => p.name)).toEqual(['id']);
+    });
+
+    test('converts hyphenated path params and leaves literal colons alone', async () => {
+      const pp = createPostProcessor(container, {
+        info: { title: 'Test', version: '1.0.0' },
+      });
+
+      @Controller('/api')
+      class MixedController {
+        @Get('/users/:user-id')
+        byUser() {}
+
+        @Get('/time:8080')
+        literal() {}
+      }
+
+      pp.postProcess(new MixedController(), MixedController);
+
+      const spec = await pp.getSpec();
+
+      expect(spec.paths['/api/users/{user-id}']).toBeDefined();
+      expect(spec.paths['/api/users/{user-id}']['get'].parameters).toEqual([
+        { name: 'user-id', in: 'path', required: true, schema: { type: 'string' } },
+      ]);
+      // Not every colon starts a parameter - a port number is part of the literal path
+      expect(spec.paths['/api/time:8080']).toBeDefined();
+    });
+
+    test('rejects two controllers claiming the same path and method', async () => {
+      const pp = createPostProcessor(container, {
+        info: { title: 'Test', version: '1.0.0' },
+      });
+
+      @Controller('/api/users')
+      class UserController {
+        @Get('/')
+        list() {}
+      }
+
+      @Controller('/api/users')
+      class LegacyUserController {
+        @Get('/')
+        list() {}
+      }
+
+      pp.postProcess(new UserController(), UserController);
+      pp.postProcess(new LegacyUserController(), LegacyUserController);
+
+      // Silently keeping the last writer meant a routable endpoint vanished from the docs
+      await expect(pp.getSpec()).rejects.toThrow(
+        /UserController.*LegacyUserController|LegacyUserController.*UserController/,
+      );
+    });
+
+    test('skips routes whose method has no OpenAPI representation', async () => {
+      const pp = createPostProcessor(container, {
+        info: { title: 'Test', version: '1.0.0' },
+      });
+
+      @Controller('/api')
+      class CatchAllController {
+        @All('/proxy')
+        proxy() {}
+
+        @Get('/health')
+        health() {}
+      }
+
+      pp.postProcess(new CatchAllController(), CatchAllController);
+
+      const spec = await pp.getSpec();
+
+      // `all` is not a Path Item field - emitting it produced a spec that fails validation
+      expect(spec.paths['/api/proxy']).toBeUndefined();
+      expect(spec.paths['/api/health']['get']).toBeDefined();
+    });
+
+    test('keeps operationIds unique across same-named controller classes', async () => {
+      const pp = createPostProcessor(container, {
+        info: { title: 'Test', version: '1.0.0' },
+      });
+
+      const makeController = (basePath: string) => {
+        @Controller(basePath)
+        class UserController {
+          @Get('/')
+          list() {}
+        }
+
+        return UserController;
+      };
+
+      const First = makeController('/api/v1/users');
+      const Second = makeController('/api/v2/users');
+
+      pp.postProcess(new First(), First);
+      pp.postProcess(new Second(), Second);
+
+      const spec = await pp.getSpec();
+
+      const first = spec.paths['/api/v1/users']['get'].operationId;
+      const second = spec.paths['/api/v2/users']['get'].operationId;
+
+      // OpenAPI requires unique operationIds; class names alone do not guarantee that
+      expect(first).toBe('UserController_list');
+      expect(second).toBe('UserController_list_2');
+    });
+
+    test('marks a request body required only when the schema has required fields', async () => {
+      const pp = createPostProcessor(container, {
+        info: { title: 'Test', version: '1.0.0' },
+      });
+
+      @Middleware({ validator: true })
+      class OptionalValidator {
+        json() {
+          return z.object({ note: z.string().optional() });
+        }
+      }
+
+      @Middleware({ validator: true })
+      class RequiredValidator {
+        json() {
+          return z.object({ name: z.string() });
+        }
+      }
+
+      @Controller('/api')
+      class BodyController {
+        @Post({ path: '/optional', validator: OptionalValidator as any })
+        optional() {}
+
+        @Post({ path: '/required', validator: RequiredValidator as any })
+        required() {}
+      }
+
+      pp.postProcess(new OptionalValidator(), OptionalValidator);
+      pp.postProcess(new RequiredValidator(), RequiredValidator);
+      pp.postProcess(new BodyController(), BodyController);
+
+      const spec = await pp.getSpec();
+
+      // A body of nothing but optional fields is not a required body
+      expect(spec.paths['/api/optional']['post'].requestBody!.required).toBeFalsy();
+      expect(spec.paths['/api/required']['post'].requestBody!.required).toBe(true);
+    });
+
+    test('marks the request body required when either content type requires fields', async () => {
+      const pp = createPostProcessor(container, {
+        info: { title: 'Test', version: '1.0.0' },
+      });
+
+      @Middleware({ validator: true })
+      class MixedValidator {
+        json() {
+          return z.object({ note: z.string().optional() });
+        }
+
+        form() {
+          return z.object({ file: z.string() });
+        }
+      }
+
+      @Controller('/api')
+      class MixedController {
+        @Post({ path: '/mixed', validator: MixedValidator as any })
+        mixed() {}
+      }
+
+      pp.postProcess(new MixedValidator(), MixedValidator);
+      pp.postProcess(new MixedController(), MixedController);
+
+      const spec = await pp.getSpec();
+
+      const { requestBody } = spec.paths['/api/mixed']['post'];
+
+      expect(requestBody!.content['application/json']).toBeDefined();
+      expect(requestBody!.content['multipart/form-data']).toBeDefined();
+      expect(requestBody!.required).toBe(true);
     });
 
     test('generates tags from controller names', async () => {

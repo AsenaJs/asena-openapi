@@ -1,6 +1,6 @@
 {
   "name": "@asenajs/asena-openapi",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "LibirSoft",
   "description": "OpenAPI 3.1 spec generation for AsenaJS - automatic schema extraction from validators and route decorators",
   "main": "dist/index.js",

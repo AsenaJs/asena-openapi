@@ -4,7 +4,7 @@
 
 # @asenajs/asena-openapi
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/AsenaJs/asena-openapi)
+[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/AsenaJs/asena-openapi)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Bun Version](https://img.shields.io/badge/Bun-1.3.12%2B-blueviolet)](https://bun.sh)
 
@@ -85,7 +85,7 @@ export class CreateUserValidator extends ValidationService {
     });
   }
 
-  // → path parameters
+  // → path parameters (only for segments the path template declares)
   param() {
     return z.object({
       id: z.string().uuid(),
@@ -101,6 +101,23 @@ export class CreateUserValidator extends ValidationService {
   }
 }
 ```
+
+### Path Parameters
+
+Every variable in a route path is documented, whether or not a `param()` validator describes it.
+`@Get('/:id')` on its own emits `id` as a required `string`; a `param()` schema replaces that
+default with its own definition. A `param()` field the path template does not mention is dropped —
+OpenAPI has nowhere to put it.
+
+### Routes That Cannot Be Documented
+
+- **`@All` and `@Connect` are skipped.** `all` and `connect` are not OpenAPI Path Item fields, so
+  emitting them produces a spec that fails validation.
+- **Two routes claiming the same path and method throw.** Generation stops and the error names both
+  controllers, rather than letting the second writer silently overwrite the first. With
+  `OpenApiPostProcessor` this surfaces on the first request to the spec endpoint, not at boot.
+- **`operationId` collisions get a numeric suffix.** Two controller classes sharing a name would
+  otherwise produce duplicate ids, which OpenAPI forbids. The first occurrence keeps the bare id.
 
 ## @Hidden
 
@@ -171,6 +188,8 @@ const generator = new OpenApiGenerator({
 
 const spec = await generator.generate(server.coreContainer.container);
 ```
+
+Both builders share one internal operation builder, so a route documents identically either way.
 
 ## Contributing
 
