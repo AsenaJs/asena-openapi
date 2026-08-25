@@ -1,5 +1,11 @@
 # @asenajs/asena-openapi
 
+## 3.0.0
+
+### Major Changes
+
+- a5aa0c1: Requires `@asenajs/asena` `^0.11.0` as the peer dependency and Bun 1.4. Core 0.10.x is outside the peer range.
+
 ## 2.1.0
 
 ### Minor Changes
