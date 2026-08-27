@@ -14,6 +14,7 @@ import type { ApiParams } from '@asenajs/asena/adapter';
 import type { ComponentPostProcessor } from '@asenajs/asena/ioc/types';
 import { OpenApiConstants } from '../constants/OpenApiConstants';
 import { ZodSchemaConverter } from '../converter/ZodSchemaConverter';
+import { buildScalarHtml, buildSwaggerHtml } from '../ui/HtmlBuilders';
 import {
   assertNoRouteCollision,
   buildOpenApiPath,
@@ -21,7 +22,7 @@ import {
   isDocumentableMethod,
   uniqueOperationId,
 } from '../shared/OperationBuilder';
-import type { OpenApiSpec } from '../types';
+import type { OpenApiSpec, OpenApiUiOption, OpenApiUiProvider } from '../types';
 import type { OpenApiDecoratorOptions } from '../decorators/OpenApi';
 
 /**
@@ -69,14 +70,19 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
       validator: undefined as any,
     });
 
-    if (options.ui) {
+    const ui = this.resolveUi(options.ui);
+
+    if (ui) {
+      const html =
+        ui.provider === 'scalar'
+          ? buildScalarHtml(options.info.title, path, ui.configuration)
+          : buildSwaggerHtml(options.info.title, path, ui.configuration);
+
       this.adapter.registerRoute({
         method: HttpMethod.GET,
         path: `${path}/ui`,
         middlewares: [],
-        handler: async (context: any) => {
-          return context.html(this.buildSwaggerHtml(options.info.title, path));
-        },
+        handler: async (context: any) => context.html(html),
         staticServe: undefined as any,
         validator: undefined as any,
       });
@@ -113,6 +119,30 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
 
   private getOptions(): OpenApiDecoratorOptions | undefined {
     return getOwnTypedMetadata<OpenApiDecoratorOptions>(OpenApiConstants.OptionsKey, this.constructor);
+  }
+
+  private resolveUi(
+    ui: OpenApiUiOption | undefined,
+  ): { provider: OpenApiUiProvider; configuration?: Record<string, unknown> } | null {
+    if (ui === undefined || ui === false) return null;
+
+    if (ui === true) return { provider: 'swagger' };
+
+    if (typeof ui === 'string') {
+      if (ui === 'swagger' || ui === 'scalar') return { provider: ui };
+
+      throw new Error(
+        `Invalid @OpenApi() ui value: "${ui}". Expected true, false, 'swagger', 'scalar' or { provider, configuration }.`,
+      );
+    }
+
+    const provider = (ui as { provider?: unknown }).provider;
+
+    if (provider === 'swagger' || provider === 'scalar') {
+      return { provider, configuration: ui.configuration };
+    }
+
+    throw new Error(`Invalid @OpenApi() ui provider: "${String(provider)}". Expected 'swagger' or 'scalar'.`);
   }
 
   private async generate(): Promise<OpenApiSpec> {
@@ -191,30 +221,5 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
 
   private isValidator(Class: any): boolean {
     return isValidatorUtil(Class);
-  }
-
-  private buildSwaggerHtml(title: string, specPath: string): string {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - API Docs</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-  <style>body { margin: 0; }</style>
-</head>
-<body>
-  <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script>
-    SwaggerUIBundle({
-      url: '${specPath}',
-      dom_id: '#swagger-ui',
-      presets: [SwaggerUIBundle.presets.apis],
-      layout: 'BaseLayout',
-    });
-  </script>
-</body>
-</html>`;
   }
 }

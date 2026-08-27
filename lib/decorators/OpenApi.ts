@@ -1,7 +1,7 @@
 import { PostProcessor } from '@asenajs/asena/decorators';
 import { defineTypedMetadata } from '@asenajs/asena/utils';
 import { OpenApiConstants } from '../constants/OpenApiConstants';
-import type { OpenApiInfo, OpenApiServer, SchemaConverter } from '../types';
+import type { OpenApiInfo, OpenApiServer, OpenApiUiOption, SchemaConverter } from '../types';
 
 /**
  * Configuration options for the @OpenApi decorator.
@@ -11,8 +11,8 @@ export interface OpenApiDecoratorOptions {
   info: OpenApiInfo;
   /** Path to serve the OpenAPI spec (default: '/openapi') */
   path?: string;
-  /** Enable Swagger UI at {path}/ui (default: false) */
-  ui?: boolean;
+  /** API docs UI served at {path}/ui (default: none). `true` = Swagger UI. */
+  ui?: OpenApiUiOption;
   /** Schema converters (default: [ZodSchemaConverter]) */
   converters?: SchemaConverter[];
   /** Server URLs for the spec */
