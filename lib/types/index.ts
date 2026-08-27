@@ -20,6 +20,27 @@ export interface SchemaConverter {
 }
 
 /**
+ * Available API documentation UI providers.
+ */
+export type OpenApiUiProvider = 'swagger' | 'scalar';
+
+/**
+ * UI option of the @OpenApi decorator.
+ *
+ * - `true` / `'swagger'` — Swagger UI (the historical behavior of `true`)
+ * - `'scalar'` — Scalar API Reference
+ * - object — provider plus raw provider configuration, merged over the defaults
+ *   (e.g. `{ provider: 'scalar', configuration: { theme: 'purple' } }`)
+ */
+export type OpenApiUiOption =
+  | boolean
+  | OpenApiUiProvider
+  | {
+      provider: OpenApiUiProvider;
+      configuration?: Record<string, unknown>;
+    };
+
+/**
  * Configuration options for the OpenAPI spec generator.
  */
 export interface OpenApiOptions {

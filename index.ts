@@ -20,6 +20,8 @@ export type {
   OpenApiOptions,
   OpenApiInfo,
   OpenApiServer,
+  OpenApiUiOption,
+  OpenApiUiProvider,
   JsonSchema,
   OpenApiSpec,
   OpenApiTag,

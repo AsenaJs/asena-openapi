@@ -859,5 +859,149 @@ describe('OpenApiPostProcessor', () => {
 
       expect(registerRoute).toHaveBeenCalledTimes(1);
     });
+
+    test('ui: true still serves Swagger UI (backwards compatible)', async () => {
+      const registerRoute = mock(() => {});
+
+      @OpenApi({
+        info: { title: 'Test', version: '1.0.0' },
+        path: '/api/openapi',
+        ui: true,
+      })
+      class AppOpenApi extends OpenApiPostProcessor {}
+
+      const pp = new AppOpenApi();
+
+      (pp as any).container = container;
+      (pp as any).adapter = { registerRoute };
+
+      pp.onInit();
+
+      // @ts-ignore
+      const uiRoute: any = registerRoute.mock.calls[1][0];
+
+      const html: string = await uiRoute.handler({ html: (h: string) => h });
+
+      expect(html).toContain('swagger-ui-bundle.js');
+      expect(html).not.toContain('@scalar/api-reference');
+    });
+
+    test("ui: 'scalar' serves Scalar API Reference at {path}/ui", async () => {
+      const registerRoute = mock(() => {});
+
+      @OpenApi({
+        info: { title: 'Test', version: '1.0.0' },
+        path: '/api/openapi',
+        ui: 'scalar',
+      })
+      class AppOpenApi extends OpenApiPostProcessor {}
+
+      const pp = new AppOpenApi();
+
+      (pp as any).container = container;
+      (pp as any).adapter = { registerRoute };
+
+      pp.onInit();
+
+      expect(registerRoute).toHaveBeenCalledTimes(2);
+
+      // @ts-ignore
+      const uiRoute: any = registerRoute.mock.calls[1][0];
+
+      expect(uiRoute.path).toBe('/api/openapi/ui');
+
+      const html: string = await uiRoute.handler({ html: (h: string) => h });
+
+      expect(html).toContain('https://cdn.jsdelivr.net/npm/@scalar/api-reference@1');
+      expect(html).toContain('Scalar.createApiReference(\'#app\', {"url":"/api/openapi"});');
+    });
+
+    test("ui: { provider: 'scalar', configuration } passes configuration through", async () => {
+      const registerRoute = mock(() => {});
+
+      @OpenApi({
+        info: { title: 'Test', version: '1.0.0' },
+        path: '/api/openapi',
+        ui: { provider: 'scalar', configuration: { theme: 'purple' } },
+      })
+      class AppOpenApi extends OpenApiPostProcessor {}
+
+      const pp = new AppOpenApi();
+
+      (pp as any).container = container;
+      (pp as any).adapter = { registerRoute };
+
+      pp.onInit();
+
+      // @ts-ignore
+      const uiRoute: any = registerRoute.mock.calls[1][0];
+
+      const html: string = await uiRoute.handler({ html: (h: string) => h });
+
+      expect(html).toContain('{"url":"/api/openapi","theme":"purple"}');
+    });
+
+    test("ui: { provider: 'swagger', configuration } serves Swagger UI with merged options", async () => {
+      const registerRoute = mock(() => {});
+
+      @OpenApi({
+        info: { title: 'Test', version: '1.0.0' },
+        path: '/api/openapi',
+        ui: { provider: 'swagger', configuration: { docExpansion: 'none' } },
+      })
+      class AppOpenApi extends OpenApiPostProcessor {}
+
+      const pp = new AppOpenApi();
+
+      (pp as any).container = container;
+      (pp as any).adapter = { registerRoute };
+
+      pp.onInit();
+
+      // @ts-ignore
+      const uiRoute: any = registerRoute.mock.calls[1][0];
+
+      const html: string = await uiRoute.handler({ html: (h: string) => h });
+
+      expect(html).toContain('swagger-ui-bundle.js');
+      expect(html).toContain('...{"docExpansion":"none"},');
+    });
+
+    test('an unknown ui provider string throws at boot', () => {
+      const registerRoute = mock(() => {});
+
+      @OpenApi({
+        info: { title: 'Test', version: '1.0.0' },
+        // @ts-expect-error runtime validation of decorator input from untyped JS
+        ui: 'rapidoc',
+      })
+      class AppOpenApi extends OpenApiPostProcessor {}
+
+      const pp = new AppOpenApi();
+
+      (pp as any).container = container;
+      (pp as any).adapter = { registerRoute };
+
+      // a typo'd provider must fail loudly, not serve a broken page
+      expect(() => pp.onInit()).toThrow('Invalid @OpenApi() ui value: "rapidoc"');
+    });
+
+    test('an invalid ui provider object throws at boot', () => {
+      const registerRoute = mock(() => {});
+
+      @OpenApi({
+        info: { title: 'Test', version: '1.0.0' },
+        // @ts-expect-error runtime validation of decorator input from untyped JS
+        ui: { provider: 'rapidoc' },
+      })
+      class AppOpenApi extends OpenApiPostProcessor {}
+
+      const pp = new AppOpenApi();
+
+      (pp as any).container = container;
+      (pp as any).adapter = { registerRoute };
+
+      expect(() => pp.onInit()).toThrow('Invalid @OpenApi() ui provider: "rapidoc"');
+    });
   });
 });
