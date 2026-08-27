@@ -1,5 +1,15 @@
 # @asenajs/asena-openapi
 
+## 3.1.0
+
+### Minor Changes
+
+- 4ec9017: Add Scalar API Reference as an alternative API docs UI. The `ui` option now accepts `'swagger'` (or `true`, unchanged), `'scalar'`, or `{ provider, configuration }` to pass raw provider configuration through (e.g. Scalar themes, SwaggerUIBundle options). The UI is still served at `{path}/ui`; invalid `ui` values now fail at boot with a clear error.
+
+### Patch Changes
+
+- 4cb8286: A `.describe()` on the `json()` schema is now moved to `requestBody.description` instead of being copied there. The JSON schema itself no longer carries it, so docs UIs that print both (Scalar) stop showing the same sentence twice.
+
 ## 3.0.0
 
 ### Major Changes
