@@ -203,8 +203,11 @@ async function extractRequestBody(
 
   const requestBody: RequestBodyObject = operation.requestBody || { content: {} };
 
+  // Moved, not copied: Scalar renders both requestBody.description and schema.description,
+  // so leaving it in place shows the same sentence twice.
   if (jsonSchema.description) {
     requestBody.description = jsonSchema.description;
+    delete jsonSchema.description;
   }
 
   // A body of nothing but optional fields is not required; json and form OR together because

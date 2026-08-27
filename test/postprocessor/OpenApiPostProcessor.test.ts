@@ -558,7 +558,7 @@ describe('OpenApiPostProcessor', () => {
       expect(limitParam?.description).toBe('Items per page');
     });
 
-    test('extracts request body description from zod describe', async () => {
+    test('moves the zod describe text to requestBody so the docs UI does not render it twice', async () => {
       @Middleware({ validator: true })
       class BodyValidator {
         json() {
@@ -588,6 +588,8 @@ describe('OpenApiPostProcessor', () => {
       const post = spec.paths['/api/users']['post'];
 
       expect(post.requestBody?.description).toBe('User creation payload');
+      expect(post.requestBody?.content['application/json'].schema.description).toBeUndefined();
+      expect(post.requestBody?.content['application/json'].schema.properties?.name).toBeDefined();
     });
 
     test('caches spec after first generation', async () => {
