@@ -26,7 +26,7 @@ Your existing `@Controller` routes and validator schemas (`json()`, `query()`, `
 ## Requirements
 
 - [Bun](https://bun.sh) v1.4 or higher
-- [@asenajs/asena](https://github.com/AsenaJs/Asena) v0.11.0 or higher
+- [@asenajs/asena](https://github.com/AsenaJs/Asena) v0.12.0 or higher
 - [Zod](https://zod.dev) v4.3 or higher
 
 ## Installation
