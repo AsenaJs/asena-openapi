@@ -1,5 +1,12 @@
 import { extractComponentName } from '@asenajs/asena/utils';
-import type { ApiParams } from '@asenajs/asena/adapter';
+import {
+  ASENA_CONTEXT_CONTRACT,
+  assertRouteContract,
+  resolveContextContract,
+  type ApiParams,
+  type InputTarget,
+  type RequestSchemas,
+} from '@asenajs/asena/adapter';
 import type {
   JsonSchema,
   OperationObject,
@@ -7,6 +14,7 @@ import type {
   RequestBodyObject,
   ResponseObject,
   SchemaConverter,
+  SchemaDirection,
 } from '../types';
 
 /**
@@ -94,6 +102,7 @@ export function uniqueOperationId(operationId: string, used: Set<string>): strin
  * Build a single OpenAPI operation object from route metadata.
  */
 export async function buildOperation(input: {
+  controller: object;
   controllerName: string;
   methodName: string;
   fullPath: string;
@@ -101,7 +110,7 @@ export async function buildOperation(input: {
   converters: SchemaConverter[];
   resolveValidator: ValidatorResolver;
 }): Promise<OperationObject> {
-  const { controllerName, methodName, fullPath, params, converters, resolveValidator } = input;
+  const { controller, controllerName, methodName, fullPath, params, converters, resolveValidator } = input;
 
   const operation: OperationObject = {
     tags: [controllerName],
@@ -117,7 +126,14 @@ export async function buildOperation(input: {
     operation.description = params.description;
   }
 
-  if (params.validator) {
+  const contextClass = resolveContextContract(controller, methodName);
+  const routeLabel = `${params.method.toUpperCase()} ${fullPath} (${controllerName}.${methodName})`;
+
+  assertRouteContract(params, contextClass, routeLabel);
+
+  if (contextClass) {
+    extractContractSchemas(operation, contextClass[ASENA_CONTEXT_CONTRACT], converters, routeLabel);
+  } else if (params.validator) {
     await extractValidatorSchemas(operation, params.validator, converters, resolveValidator);
   }
 
@@ -128,6 +144,80 @@ export async function buildOperation(input: {
   }
 
   return operation;
+}
+
+/** Request contracts are a static source. A converter must be able to describe every declared target. */
+// eslint-disable-next-line max-params, complexity
+function extractContractSchemas(
+  operation: OperationObject,
+  schemas: Readonly<RequestSchemas>,
+  converters: SchemaConverter[],
+  routeLabel: string,
+): void {
+  for (const target of ['body', 'form', 'query', 'params', 'headers'] as const satisfies readonly InputTarget[]) {
+    const schema = schemas[target];
+
+    if (!schema) continue;
+
+    let jsonSchema: JsonSchema | undefined;
+
+    try {
+      jsonSchema = convertSchema(schema, converters, 'input', true);
+    } catch (error) {
+      throw new Error(`OpenAPI ${routeLabel}: cannot convert contract ${target} schema to JSON Schema`, {
+        cause: error,
+      });
+    }
+
+    if (!jsonSchema) throw new Error(`OpenAPI ${routeLabel}: cannot convert contract ${target} schema to JSON Schema`);
+
+    if (target === 'body' || target === 'form') {
+      const requestBody: RequestBodyObject = operation.requestBody || { content: {} };
+      const contentType = target === 'body' ? 'application/json' : 'multipart/form-data';
+
+      const bodySchema = { ...jsonSchema };
+
+      if (bodySchema.description) {
+        requestBody.description = bodySchema.description;
+        delete bodySchema.description;
+      }
+
+      // A Standard Schema contract does not expose whether the entire body may be absent.
+      // Require the body conservatively; JSON Schema's required[] concerns object fields only.
+      requestBody.required = true;
+      requestBody.content[contentType] = { schema: bodySchema };
+      operation.requestBody = requestBody;
+      continue;
+    }
+
+    const location = target === 'params' ? 'path' : target === 'headers' ? 'header' : 'query';
+
+    if (
+      jsonSchema.type !== 'object' ||
+      !jsonSchema.properties ||
+      typeof jsonSchema.properties !== 'object' ||
+      Array.isArray(jsonSchema.properties)
+    ) {
+      throw new Error(
+        `OpenAPI ${routeLabel}: contract ${target} schema must convert to an object with parameter properties`,
+      );
+    }
+
+    operation.parameters ??= [];
+
+    for (const [name, propertySchema] of Object.entries(jsonSchema.properties)) {
+      const param: ParameterObject = {
+        name,
+        in: location,
+        schema: propertySchema,
+        required: location === 'path' || jsonSchema.required?.includes(name) || undefined,
+      };
+
+      if (propertySchema.description) param.description = propertySchema.description;
+
+      operation.parameters.push(param);
+    }
+  }
 }
 
 /**
@@ -197,7 +287,7 @@ async function extractRequestBody(
 
   const rawSchema = await validator[method]();
   const schema = unwrapSchema(rawSchema);
-  const jsonSchema = convertSchema(schema, converters);
+  const jsonSchema = convertSchema(schema, converters, 'input');
 
   if (!jsonSchema) return;
 
@@ -232,7 +322,7 @@ async function extractParameters(
 
   const rawSchema = await validator[method]();
   const schema = unwrapSchema(rawSchema);
-  const jsonSchema = convertSchema(schema, converters);
+  const jsonSchema = convertSchema(schema, converters, 'input');
 
   if (!jsonSchema || !jsonSchema.properties) return;
 
@@ -280,14 +370,14 @@ async function extractResponses(
         }
 
         if (entry.schema) {
-          const jsonSchema = convertSchema(unwrapSchema(entry.schema), converters);
+          const jsonSchema = convertSchema(unwrapSchema(entry.schema), converters, 'output');
 
           if (jsonSchema) {
             responseObj.content = { 'application/json': { schema: jsonSchema } };
           }
         }
       } else {
-        const jsonSchema = convertSchema(unwrapSchema(entry), converters);
+        const jsonSchema = convertSchema(unwrapSchema(entry), converters, 'output');
 
         if (jsonSchema) {
           responseObj.content = { 'application/json': { schema: jsonSchema } };
@@ -300,7 +390,7 @@ async function extractResponses(
     return;
   }
 
-  const jsonSchema = convertSchema(unwrapSchema(rawResponse), converters);
+  const jsonSchema = convertSchema(unwrapSchema(rawResponse), converters, 'output');
 
   if (jsonSchema) {
     operation.responses['200'] = {
@@ -350,10 +440,16 @@ function unwrapSchema(schema: unknown): unknown {
 /**
  * Convert a raw schema through the converter chain. Returns the first successful conversion.
  */
-function convertSchema(schema: unknown, converters: SchemaConverter[]): JsonSchema | undefined {
+// eslint-disable-next-line max-params
+function convertSchema(
+  schema: unknown,
+  converters: SchemaConverter[],
+  direction: SchemaDirection,
+  strict = false,
+): JsonSchema | undefined {
   for (const converter of converters) {
-    if (converter.canConvert(schema)) {
-      return converter.convert(schema);
+    if (converter.canConvert(schema, direction)) {
+      return converter.convert(schema, direction, { strict });
     }
   }
 

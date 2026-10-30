@@ -1,20 +1,19 @@
-import { Inject, PostConstruct } from '@asenajs/asena/decorators/ioc';
+import type { ApiParams, AsenaAdapter } from '@asenajs/asena/adapter';
+import { Inject, OnStart } from '@asenajs/asena/decorators/ioc';
+import type { ComponentPostProcessor } from '@asenajs/asena/ioc/types';
 import { ICoreServiceNames } from '@asenajs/asena/ioc/types';
 import {
   extractComponentName,
   extractControllerRouteInfo,
   getChainedTypedMetadataList,
   getOwnTypedMetadata,
-  isValidator as isValidatorUtil,
   isController as isControllerUtil,
+  isValidator as isValidatorUtil,
 } from '@asenajs/asena/utils';
 import { HttpMethod } from '@asenajs/asena/web-types';
-import type { AsenaAdapter } from '@asenajs/asena/adapter';
-import type { ApiParams } from '@asenajs/asena/adapter';
-import type { ComponentPostProcessor } from '@asenajs/asena/ioc/types';
 import { OpenApiConstants } from '../constants/OpenApiConstants';
 import { ZodSchemaConverter } from '../converter/ZodSchemaConverter';
-import { buildScalarHtml, buildSwaggerHtml } from '../ui/HtmlBuilders';
+import type { OpenApiDecoratorOptions } from '../decorators/OpenApi';
 import {
   assertNoRouteCollision,
   buildOpenApiPath,
@@ -23,7 +22,7 @@ import {
   uniqueOperationId,
 } from '../shared/OperationBuilder';
 import type { OpenApiSpec, OpenApiUiOption, OpenApiUiProvider } from '../types';
-import type { OpenApiDecoratorOptions } from '../decorators/OpenApi';
+import { buildScalarHtml, buildSwaggerHtml } from '../ui/HtmlBuilders';
 
 /**
  * PostProcessor that automatically generates OpenAPI 3.1 specs from controllers and validators.
@@ -49,7 +48,7 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
 
   private _spec: OpenApiSpec | null = null;
 
-  @PostConstruct()
+  @OnStart()
   public onInit(): void {
     const options = this.getOptions();
 
@@ -68,6 +67,7 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
       },
       staticServe: undefined as any,
       validator: undefined as any,
+      controllerName: 'OpenAPIController',
     });
 
     const ui = this.resolveUi(options.ui);
@@ -85,6 +85,7 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
         handler: async (context: any) => context.html(html),
         staticServe: undefined as any,
         validator: undefined as any,
+        controllerName: 'OpenAPIController',
       });
     }
   }
@@ -184,6 +185,7 @@ export class OpenApiPostProcessor implements ComponentPostProcessor {
         assertNoRouteCollision(spec.paths[fullPath]?.[params.method], params.method, fullPath, controllerName);
 
         const operation = await buildOperation({
+          controller: instance,
           controllerName,
           methodName,
           fullPath,

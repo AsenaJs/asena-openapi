@@ -7,17 +7,23 @@ export interface SchemaConverter {
   /**
    * Checks whether this converter can handle the given schema.
    * @param schema - Raw schema object (e.g., a Zod type)
+   * @param direction - Request input or response output shape
    * @returns true if this converter can convert it
    */
-  canConvert(schema: unknown): boolean;
+  canConvert(schema: unknown, direction?: SchemaDirection): boolean;
 
   /**
    * Converts a schema to JSON Schema format.
    * @param schema - Raw schema object
+   * @param direction - Request input or response output shape
+   * @param options - Strict mode is used for route contracts, which must be documentable
    * @returns JSON Schema representation, or undefined if conversion fails
    */
-  convert(schema: unknown): JsonSchema | undefined;
+  convert(schema: unknown, direction?: SchemaDirection, options?: { strict?: boolean }): JsonSchema | undefined;
 }
+
+/** The side of a Standard Schema contract represented in JSON Schema. */
+export type SchemaDirection = 'input' | 'output';
 
 /**
  * Available API documentation UI providers.

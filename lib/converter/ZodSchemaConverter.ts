@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { JsonSchema, SchemaConverter } from '../types';
+import type { JsonSchema, SchemaConverter, SchemaDirection } from '../types';
 
 /**
  * Converts Zod schemas to JSON Schema using Zod v4's built-in `z.toJSONSchema()`.
@@ -19,11 +19,16 @@ export class ZodSchemaConverter implements SchemaConverter {
     return schema instanceof z.ZodType;
   }
 
-  public convert(schema: unknown): JsonSchema | undefined {
+  public convert(
+    schema: unknown,
+    direction: SchemaDirection = 'output',
+    options?: { strict?: boolean },
+  ): JsonSchema | undefined {
     if (!this.canConvert(schema)) return undefined;
 
     return z.toJSONSchema(schema as z.ZodType, {
-      unrepresentable: 'any',
+      io: direction,
+      unrepresentable: options?.strict ? 'throw' : 'any',
       override: (ctx) => {
         // Convert z.date() to { type: 'string', format: 'date-time' }
         if (ctx.zodSchema instanceof z.ZodDate) {
