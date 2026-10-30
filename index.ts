@@ -17,6 +17,7 @@ export { OpenApiConstants } from './lib/constants/OpenApiConstants';
 // Types
 export type {
   SchemaConverter,
+  SchemaDirection,
   OpenApiOptions,
   OpenApiInfo,
   OpenApiServer,

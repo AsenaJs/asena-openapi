@@ -9,7 +9,7 @@ import { ZodSchemaConverter } from '../../lib/converter/ZodSchemaConverter';
 import { OpenApi } from '../../lib/decorators/OpenApi';
 import { OpenApiGenerator } from '../../lib/generator/OpenApiGenerator';
 import { OpenApiPostProcessor } from '../../lib/postprocessor/OpenApiPostProcessor';
-import type { JsonSchema, SchemaConverter } from '../../lib/types';
+import type { JsonSchema, SchemaConverter, SchemaDirection } from '../../index';
 
 function context(schemas: Parameters<typeof defineRequestSchemas>[0]) {
   class ContractContext {
@@ -162,7 +162,7 @@ describe('context contracts in OpenAPI', () => {
         calls.push(`can:${direction}`);
         return schema === custom;
       },
-      convert: (_schema, direction): JsonSchema => {
+      convert: (_schema, direction?: SchemaDirection): JsonSchema => {
         calls.push(`convert:${direction}`);
         return { type: 'string' };
       },
