@@ -84,6 +84,7 @@ export class OpenApiGenerator {
         assertNoRouteCollision(spec.paths[fullPath]?.[params.method], params.method, fullPath, controllerName);
 
         const operation = await buildOperation({
+          controller,
           controllerName,
           methodName,
           fullPath,
