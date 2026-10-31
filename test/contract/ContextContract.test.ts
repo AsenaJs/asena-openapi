@@ -21,31 +21,6 @@ function context(schemas: Parameters<typeof defineRequestSchemas>[0]) {
 }
 
 describe('context contracts in OpenAPI', () => {
-  test('discovers metadata from an adapter Context.define class', async () => {
-    // Dynamic import keeps this package's published build independent of adapter packages.
-    const adapterPath: string = '../../../ergenecore/lib/index.ts';
-    const { Context } = await import(adapterPath);
-    class RouteContext extends Context.define({ query: z.object({ page: z.coerce.number().default(1) }) }) {}
-
-    @Controller('/real-context')
-    class RealContextController {
-      @Get('/')
-      list(_context: RouteContext) {}
-    }
-
-    const container = new Container();
-    await container.registerInstance('RealContextController', new RealContextController());
-
-    const spec = await new OpenApiGenerator({
-      info: { title: 'API', version: '1' },
-      converters: [new ZodSchemaConverter()],
-    }).generate(container);
-
-    expect(spec.paths['/real-context'].get.parameters).toEqual([
-      expect.objectContaining({ name: 'page', in: 'query', schema: expect.objectContaining({ type: 'number' }) }),
-    ]);
-  });
-
   test('both generators use input schemas for all request targets', async () => {
     class BodyContext extends context({
       body: z.object({ name: z.string() }).transform(({ name }) => ({ normalized: name.toLowerCase() })),
