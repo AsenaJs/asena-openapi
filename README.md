@@ -4,7 +4,7 @@
 
 # @asenajs/asena-openapi
 
-[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/AsenaJs/asena-openapi)
+[![Version](https://img.shields.io/npm/v/@asenajs/asena-openapi.svg)](https://github.com/AsenaJs/asena-openapi)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Bun Version](https://img.shields.io/badge/Bun-1.4%2B-blueviolet)](https://bun.sh)
 
