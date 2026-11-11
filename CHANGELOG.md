@@ -1,5 +1,11 @@
 # @asenajs/asena-openapi
 
+## 3.2.1
+
+### Patch Changes
+
+- 5cc7ce8: Accept @asenajs/asena 0.13 as a peer.
+
 ## 3.2.0
 
 ### Minor Changes
