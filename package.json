@@ -33,8 +33,8 @@
     "format:check": "bun fmt --check",
     "check": "bun run lint && bun run format:check",
     "check:fix": "bun run lint:fix && bun run format",
-    "changeset": "changeset && bun fmt",
-    "version": "changeset version && bun fmt",
+    "changeset": "sh -c 'changeset \"$@\" && bun fmt .changeset' --",
+    "version": "sh -c 'changeset version \"$@\" && bun fmt .changeset CHANGELOG.md package.json' --",
     "release": "bun run build && changeset publish"
   },
   "devDependencies": {
