@@ -35,11 +35,11 @@ function runScript(name: string, args: string[], env: Record<string, string> = {
 }
 
 describe('changeset script', () => {
-  test('forwards CLI arguments to changeset, then formats only the changeset folder', () => {
+  test('forwards CLI arguments to changeset, then formats the files changeset writes', () => {
     const { stdout, exitCode } = runScript('changeset', ['status', '--since=master']);
 
     expect(exitCode).toBe(0);
-    expect(stdout).toBe('changeset:status --since=master\nbun:fmt .changeset\n');
+    expect(stdout).toBe('changeset:status --since=master\nbun:fmt .changeset CHANGELOG.md package.json\n');
   });
 
   test('skips formatting when changeset fails', () => {
