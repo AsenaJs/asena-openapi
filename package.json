@@ -34,9 +34,7 @@
     "check": "bun run lint && bun run format:check",
     "check:fix": "bun run lint:fix && bun run format",
     "changeset": "changeset",
-    "postchangeset": "bun fmt .changeset CHANGELOG.md package.json",
     "version": "changeset version",
-    "postversion": "bun fmt .changeset CHANGELOG.md package.json",
     "release": "bun run build && changeset publish"
   },
   "devDependencies": {

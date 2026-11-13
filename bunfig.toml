@@ -33,3 +33,4 @@ experimentalOperatorPosition = "end"
 singleAttributePerLine = false
 requirePragma = false
 insertPragma = false
+ignorePatterns = ["CHANGELOG.md", ".changeset/"]
