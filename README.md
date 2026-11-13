@@ -44,7 +44,7 @@ Full documentation: [asena.sh/docs/packages/openapi](https://asena.sh/docs/packa
 
 Contributions are welcome. Submit a Pull Request on [GitHub](https://github.com/AsenaJs/asena-openapi).
 
-Run `bun run check` before pushing. Add a changeset with `bun run changeset`, not `bunx changeset`: only the script formats the new file the way `bun run check` expects.
+Run `bun run check` before pushing.
 
 ## License
 
