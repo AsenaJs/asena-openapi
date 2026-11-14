@@ -270,8 +270,8 @@ describe('OpenApiGenerator', () => {
       expect(content).toBeDefined();
       // toMatchObject: z.toJSONSchema also emits contentEncoding alongside format;
       // the load-bearing part for Swagger UI's file picker is type+format
-      expect(content.schema.properties.image).toMatchObject({ type: 'string', format: 'binary' });
-      expect(content.schema.properties.title).toMatchObject({ type: 'string' });
+      expect(content.schema.properties!.image).toMatchObject({ type: 'string', format: 'binary' });
+      expect(content.schema.properties!.title).toMatchObject({ type: 'string' });
     });
 
     test('should extract query parameters from validator.query()', async () => {

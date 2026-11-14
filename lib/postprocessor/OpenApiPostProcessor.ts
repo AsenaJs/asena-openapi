@@ -40,7 +40,7 @@ import { buildScalarHtml, buildSwaggerHtml } from '../ui/HtmlBuilders';
  */
 export class OpenApiPostProcessor implements ComponentPostProcessor {
   @Inject(ICoreServiceNames.ASENA_ADAPTER)
-  private adapter: AsenaAdapter<any, any>;
+  private adapter!: AsenaAdapter<any, any>;
 
   private controllers: { instance: any; Class: any }[] = [];
 
