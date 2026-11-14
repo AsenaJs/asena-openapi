@@ -44,6 +44,8 @@ Full documentation: [asena.sh/docs/packages/openapi](https://asena.sh/docs/packa
 
 Contributions are welcome. Submit a Pull Request on [GitHub](https://github.com/AsenaJs/asena-openapi).
 
+Run `bun run check` before pushing.
+
 ## License
 
 MIT
